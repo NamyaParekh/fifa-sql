@@ -753,6 +753,42 @@ app.post('/api/query', async (req, res) => {
     }
 });
 
+// Health check endpoint
+app.get('/health', async (req, res) => {
+    try {
+        if (process.env.DB_TYPE === 'postgres') {
+            const result = await db.query('SELECT NOW() as current_time');
+            res.json({
+                status: 'healthy',
+                database: 'PostgreSQL',
+                time: result.rows[0].current_time,
+                env_vars: {
+                    DB_TYPE: process.env.DB_TYPE,
+                    DATABASE_URL: process.env.DATABASE_URL ? 'SET' : 'NOT SET'
+                }
+            });
+        } else {
+            res.json({
+                status: 'healthy',
+                database: 'MySQL',
+                env_vars: {
+                    DB_TYPE: process.env.DB_TYPE || 'NOT SET',
+                    DB_HOST: process.env.DB_HOST || 'NOT SET'
+                }
+            });
+        }
+    } catch (error) {
+        res.status(500).json({
+            status: 'unhealthy',
+            error: error.message,
+            env_vars: {
+                DB_TYPE: process.env.DB_TYPE || 'NOT SET',
+                DATABASE_URL: process.env.DATABASE_URL ? 'SET' : 'NOT SET'
+            }
+        });
+    }
+});
+
 // Serve the main page
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
