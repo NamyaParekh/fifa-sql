@@ -1,5 +1,6 @@
 const express = require('express');
 const mysql = require('mysql2');
+const { Pool } = require('pg');
 const path = require('path');
 const cors = require('cors');
 
@@ -11,117 +12,111 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// MySQL connection pool - better for production
-const db = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'Namya@123',
-    database: process.env.DB_NAME || 'fifa_playerstats',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-});
+// Database connection - support both MySQL (local) and PostgreSQL (production)
+let db;
 
-db.getConnection((err, connection) => {
-    if (err) {
-        console.error('Error connecting to MySQL:', err);
-        console.error('Please check:');
-        console.error('1. MySQL server is running');
-        console.error('2. Username and password are correct');
-        console.error('3. MySQL is accessible from this application');
-        return;
-    }
-    
-    console.log('✓ Successfully connected to MySQL server');
-    
-    // Show all available databases first
-    connection.query('SHOW DATABASES', (err, results) => {
-        if (err) {
-            console.error('Error showing databases:', err.message);
-            return;
-        }
-        console.log('\n=== AVAILABLE DATABASES ===');
-        results.forEach(row => {
-            const dbName = Object.values(row)[0];
-            console.log(' -', dbName);
-        });
-        
-        // Check if 'fifa_playerstats' database exists
-        const hasFifaDb = results.some(row => {
-            const dbName = Object.values(row)[0];
-            return dbName.toLowerCase() === 'fifa_playerstats';
-        });
-        
-        if (!hasFifaDb) {
-            console.log('\n⚠️  WARNING: "fifa_playerstats" database not found!');
-            console.log('Available databases are listed above. Please choose the correct one.');
-            console.log('Common alternatives might be: "fifa", "fifa_db", "football", etc.');
-        } else {
-            console.log('\n✓ "fifa_playerstats" database found');
-            // Try to use the 'fifa_playerstats' database and show its tables
-            connection.changeUser({ database: 'fifa_playerstats' }, (err) => {
-                if (err) {
-                    console.error('Error switching to fifa_playerstats database:', err.message);
-                    return;
-                }
-                console.log('✓ Successfully switched to fifa_playerstats database');
-                
-                // Show tables in fifa_playerstats database
-                connection.query('SHOW TABLES', (err, results) => {
-                    if (err) {
-                        console.error('Error showing tables:', err.message);
-                        return;
-                    }
-                    console.log('\n=== TABLES IN FIFA_PLAYERSTATS DATABASE ===');
-                    if (results.length === 0) {
-                        console.log('No tables found in fifa_playerstats database');
-                        console.log('The database exists but is empty. You may need to import your FIFA data.');
-                    } else {
-                        console.log('Available table names:');
-                        results.forEach(row => {
-                            const tableName = Object.values(row)[0];
-                            console.log(' -', tableName);
-                        });
-                        
-                        // Auto-detect the main player table
-                        const playerTable = detectPlayerTable(results);
-                        if (playerTable) {
-                            console.log(`\n✓ Auto-detected main player table: "${playerTable}"`);
-                            console.log('Natural language patterns will use this table name.');
-                            
-                            // Show column names for the player table
-                            connection.query(`DESCRIBE ${playerTable}`, (err, columnResults) => {
-                                if (!err) {
-                                    console.log(`\n=== COLUMNS IN ${playerTable.toUpperCase()} TABLE ===`);
-                                    columnResults.forEach(col => {
-                                        console.log(` - ${col.Field} (${col.Type})`);
-                                    });
-                                }
-                            });
-                            
-                            // Check if there's actual data in the player table
-                            connection.query(`SELECT COUNT(*) as total_count FROM ${playerTable}`, (countErr, countResults) => {
-                                if (!countErr) {
-                                    console.log(`\n=== DATA CHECK ===`);
-                                    console.log(`Total players in ${playerTable}: ${countResults[0].total_count}`);
-                                    if (countResults[0].total_count === 0) {
-                                        console.log('⚠️  WARNING: No player data found in the table!');
-                                    } else {
-                                        console.log('✓ Player data exists in the table.');
-                                    }
-                                }
-                            });
-                        } else {
-                            console.log('\n⚠️  Could not auto-detect player table. Please manually update the patterns.');
-                        }
-                    }
-                });
-                
-                // Release the connection back to the pool
-                connection.release();
-            });
+if (process.env.DB_TYPE === 'postgres') {
+    // PostgreSQL connection for production (Render)
+    db = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: {
+            rejectUnauthorized: false
         }
     });
+    console.log('Using PostgreSQL database');
+} else {
+    // MySQL connection for local development
+    db = mysql.createPool({
+        host: process.env.DB_HOST || 'localhost',
+        user: process.env.DB_USER || 'root',
+        password: process.env.DB_PASSWORD || 'Namya@123',
+        database: process.env.DB_NAME || 'fifa_playerstats',
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0
+    });
+    console.log('Using MySQL database');
+}
+
+// Database connection test
+async function testDatabaseConnection() {
+    try {
+        if (process.env.DB_TYPE === 'postgres') {
+            // PostgreSQL connection test
+            const result = await db.query('SELECT current_database()');
+            console.log('✓ Successfully connected to PostgreSQL database');
+            console.log(`Database: ${result.rows[0].current_database}`);
+            
+            // Show tables
+            const tables = await db.query(`
+                SELECT table_name FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                ORDER BY table_name
+            `);
+            
+            console.log('\n=== TABLES IN DATABASE ===');
+            if (tables.rows.length === 0) {
+                console.log('No tables found. You may need to create tables.');
+            } else {
+                tables.rows.forEach(row => {
+                    console.log(' -', row.table_name);
+                });
+            }
+            
+            return 'playerstats'; // Default table name for PostgreSQL
+        } else {
+            // MySQL connection test
+            const connection = await new Promise((resolve, reject) => {
+                db.getConnection((err, conn) => {
+                    if (err) reject(err);
+                    else resolve(conn);
+                });
+            });
+            
+            console.log('✓ Successfully connected to MySQL server');
+            
+            // Show databases
+            const databases = await new Promise((resolve, reject) => {
+                connection.query('SHOW DATABASES', (err, results) => {
+                    if (err) reject(err);
+                    else resolve(results);
+                });
+            });
+            
+            console.log('\n=== AVAILABLE DATABASES ===');
+            databases.forEach(row => {
+                const dbName = Object.values(row)[0];
+                console.log(' -', dbName);
+            });
+            
+            // Show tables in fifa_playerstats
+            const tables = await new Promise((resolve, reject) => {
+                connection.query('SHOW TABLES', (err, results) => {
+                    if (err) reject(err);
+                    else resolve(results);
+                });
+            });
+            
+            console.log('\n=== TABLES IN DATABASE ===');
+            tables.forEach(row => {
+                const tableName = Object.values(row)[0];
+                console.log(' -', tableName);
+            });
+            
+            connection.release();
+            return 'playerstats'; // Default table name for MySQL
+        }
+    } catch (error) {
+        console.error('Database connection error:', error);
+        return 'playerstats'; // Fallback
+    }
+}
+
+// Test connection on startup
+testDatabaseConnection().then(tableName => {
+    console.log(`\n✓ Using table: ${tableName}`);
+}).catch(err => {
+    console.error('Database initialization failed:', err);
 });
 
 // Function to auto-detect the main player table
@@ -685,7 +680,7 @@ function generateNaturalLanguageSummary(sqlQuery, results, rowCount) {
 }
 
 // API route to execute SQL queries
-app.post('/api/query', (req, res) => {
+app.post('/api/query', async (req, res) => {
     const { query } = req.body;
     
     if (!query) {
@@ -702,34 +697,60 @@ app.post('/api/query', (req, res) => {
         return res.status(400).json({ error: 'Only SELECT, SHOW, and DESCRIBE queries are allowed' });
     }
     
-    db.getConnection((err, connection) => {
-        if (err) {
-            console.error('Error getting database connection:', err);
-            return res.status(500).json({ error: 'Database connection error' });
-        }
-        
-        connection.query(query, (err, results) => {
-            connection.release(); // Release connection back to pool
-            
-            if (err) {
-                console.error('SQL Error:', err);
-                return res.status(500).json({ error: err.message });
-            }
+    if (process.env.DB_TYPE === 'postgres') {
+        // PostgreSQL query execution
+        try {
+            const result = await db.query(query);
+            const results = result.rows;
+            const rowCount = result.rowCount;
             
             console.log('Query Results:', results); // Debug
             console.log('Results Length:', results.length); // Debug
             
             // Generate natural language summary
-            const nlSummary = generateNaturalLanguageSummary(query, results, results.length);
+            const nlSummary = generateNaturalLanguageSummary(query, results, rowCount);
             
             res.json({
                 success: true,
                 data: results,
-                rowCount: results.length,
+                rowCount: rowCount,
                 nlSummary: nlSummary
             });
+        } catch (error) {
+            console.error('SQL Error:', error);
+            return res.status(500).json({ error: error.message });
+        }
+    } else {
+        // MySQL query execution
+        db.getConnection((err, connection) => {
+            if (err) {
+                console.error('Error getting database connection:', err);
+                return res.status(500).json({ error: 'Database connection error' });
+            }
+            
+            connection.query(query, (err, results) => {
+                connection.release(); // Release connection back to pool
+                
+                if (err) {
+                    console.error('SQL Error:', err);
+                    return res.status(500).json({ error: err.message });
+                }
+                
+                console.log('Query Results:', results); // Debug
+                console.log('Results Length:', results.length); // Debug
+                
+                // Generate natural language summary
+                const nlSummary = generateNaturalLanguageSummary(query, results, results.length);
+                
+                res.json({
+                    success: true,
+                    data: results,
+                    rowCount: results.length,
+                    nlSummary: nlSummary
+                });
+            });
         });
-    });
+    }
 });
 
 // Serve the main page
