@@ -4,18 +4,19 @@ const path = require('path');
 const cors = require('cors');
 
 const app = express();
-const port = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// MySQL connection - connect without database first to show available databases
+// MySQL connection - use environment variables for production
 const db = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: 'Namya@123'
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || 'Namya@123',
+    database: process.env.DB_NAME || 'fifa_playerstats'
 });
 
 db.connect((err) => {
