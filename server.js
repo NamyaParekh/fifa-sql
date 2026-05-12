@@ -3,6 +3,7 @@ const mysql = require('mysql2');
 const { Pool } = require('pg');
 const path = require('path');
 const cors = require('cors');
+const fs = require('fs');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -12,127 +13,17 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Database connection - support both MySQL (local) and PostgreSQL (production)
-let db;
+// Load PKL data
+let playerData = [];
 
-if (process.env.DB_TYPE === 'postgres') {
-    // PostgreSQL connection for production (Render)
-    if (process.env.DATABASE_URL) {
-        db = new Pool({
-            connectionString: process.env.DATABASE_URL,
-            ssl: {
-                rejectUnauthorized: false
-            }
-        });
-        console.log('Using PostgreSQL database with DATABASE_URL');
-    } else {
-        // Fallback for Render environment
-        db = new Pool({
-            host: process.env.DB_HOST || 'localhost',
-            user: process.env.DB_USER || 'postgres',
-            password: process.env.DB_PASSWORD || '',
-            database: process.env.DB_NAME || 'fifa_playerstats',
-            port: process.env.DB_PORT || 5432,
-            ssl: {
-                rejectUnauthorized: false
-            }
-        });
-        console.log('Using PostgreSQL database with individual env vars');
-    }
-} else {
-    // MySQL connection for local development
-    db = mysql.createPool({
-        host: process.env.DB_HOST || 'localhost',
-        user: process.env.DB_USER || 'root',
-        password: process.env.DB_PASSWORD || 'Namya@123',
-        database: process.env.DB_NAME || 'fifa_playerstats',
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0
-    });
-    console.log('Using MySQL database');
+try {
+    const data = fs.readFileSync('./fifa_data.pkl', 'utf8');
+    playerData = JSON.parse(data);
+    console.log(`✓ Loaded ${playerData.length} players from PKL file`);
+} catch (error) {
+    console.error('Error loading PKL file:', error);
+    playerData = [];
 }
-
-// Database connection test
-async function testDatabaseConnection() {
-    try {
-        if (process.env.DB_TYPE === 'postgres') {
-            // PostgreSQL connection test
-            const result = await db.query('SELECT current_database()');
-            console.log('✓ Successfully connected to PostgreSQL database');
-            console.log(`Database: ${result.rows[0].current_database}`);
-            
-            // Show tables
-            const tables = await db.query(`
-                SELECT table_name FROM information_schema.tables 
-                WHERE table_schema = 'public' 
-                ORDER BY table_name
-            `);
-            
-            console.log('\n=== TABLES IN DATABASE ===');
-            if (tables.rows.length === 0) {
-                console.log('No tables found. You may need to create tables.');
-            } else {
-                tables.rows.forEach(row => {
-                    console.log(' -', row.table_name);
-                });
-            }
-            
-            return 'playerstats'; // Default table name for PostgreSQL
-        } else {
-            // MySQL connection test
-            const connection = await new Promise((resolve, reject) => {
-                db.getConnection((err, conn) => {
-                    if (err) reject(err);
-                    else resolve(conn);
-                });
-            });
-            
-            console.log('✓ Successfully connected to MySQL server');
-            
-            // Show databases
-            const databases = await new Promise((resolve, reject) => {
-                connection.query('SHOW DATABASES', (err, results) => {
-                    if (err) reject(err);
-                    else resolve(results);
-                });
-            });
-            
-            console.log('\n=== AVAILABLE DATABASES ===');
-            databases.forEach(row => {
-                const dbName = Object.values(row)[0];
-                console.log(' -', dbName);
-            });
-            
-            // Show tables in fifa_playerstats
-            const tables = await new Promise((resolve, reject) => {
-                connection.query('SHOW TABLES', (err, results) => {
-                    if (err) reject(err);
-                    else resolve(results);
-                });
-            });
-            
-            console.log('\n=== TABLES IN DATABASE ===');
-            tables.forEach(row => {
-                const tableName = Object.values(row)[0];
-                console.log(' -', tableName);
-            });
-            
-            connection.release();
-            return 'playerstats'; // Default table name for MySQL
-        }
-    } catch (error) {
-        console.error('Database connection error:', error);
-        return 'playerstats'; // Fallback
-    }
-}
-
-// Test connection on startup
-testDatabaseConnection().then(tableName => {
-    console.log(`\n✓ Using table: ${tableName}`);
-}).catch(err => {
-    console.error('Database initialization failed:', err);
-});
 
 // Function to auto-detect the main player table
 function detectPlayerTable(tables) {
@@ -712,60 +603,172 @@ app.post('/api/query', async (req, res) => {
         return res.status(400).json({ error: 'Only SELECT, SHOW, and DESCRIBE queries are allowed' });
     }
     
-    if (process.env.DB_TYPE === 'postgres') {
-        // PostgreSQL query execution
-        try {
-            const result = await db.query(query);
-            const results = result.rows;
-            const rowCount = result.rowCount;
-            
-            console.log('Query Results:', results); // Debug
-            console.log('Results Length:', results.length); // Debug
-            
-            // Generate natural language summary
-            const nlSummary = generateNaturalLanguageSummary(query, results, rowCount);
-            
-            res.json({
-                success: true,
-                data: results,
-                rowCount: rowCount,
-                nlSummary: nlSummary
-            });
-        } catch (error) {
-            console.error('SQL Error:', error);
-            return res.status(500).json({ error: error.message });
-        }
+    // Query execution using PKL data
+console.log('Executing query:', query); // Debug
+console.log('Trimmed query:', trimmedQuery); // Debug
+
+try {
+    let results = [];
+    let rowCount = 0;
+    
+    // Handle SELECT queries on PKL data
+    if (trimmedQuery.startsWith('select')) {
+        // Parse SELECT query and filter PKL data
+        results = filterPlayerData(query, playerData);
+        rowCount = results.length;
+        
+        console.log('PKL Query Results:', results); // Debug
+        console.log('PKL Results Length:', results.length); // Debug
+        
+        // Generate natural language summary
+        const nlSummary = generateNaturalLanguageSummary(query, results, rowCount);
+        
+        res.json({
+            success: true,
+            data: results,
+            rowCount: rowCount,
+            nlSummary: nlSummary
+        });
     } else {
-        // MySQL query execution
-        db.getConnection((err, connection) => {
-            if (err) {
-                console.error('Error getting database connection:', err);
-                return res.status(500).json({ error: 'Database connection error' });
-            }
-            
-            connection.query(query, (err, results) => {
-                connection.release(); // Release connection back to pool
-                
-                if (err) {
-                    console.error('SQL Error:', err);
-                    return res.status(500).json({ error: err.message });
-                }
-                
-                console.log('Query Results:', results); // Debug
-                console.log('Results Length:', results.length); // Debug
-                
-                // Generate natural language summary
-                const nlSummary = generateNaturalLanguageSummary(query, results, results.length);
-                
-                res.json({
-                    success: true,
-                    data: results,
-                    rowCount: results.length,
-                    nlSummary: nlSummary
-                });
-            });
+        // Handle non-SELECT queries (SHOW, DESCRIBE, etc.)
+        return res.status(400).json({ 
+            error: 'PKL mode only supports SELECT queries. Use queries like "show all players", "show players from chelsea", etc.' 
         });
     }
+} catch (error) {
+    console.error('Query Error:', error);
+    return res.status(500).json({ error: error.message });
+}
+
+// Function to filter PKL data based on SQL query
+function filterPlayerData(query, data) {
+    const lowerQuery = query.toLowerCase();
+    
+    // Handle different SELECT patterns
+    if (lowerQuery.includes('show all') || lowerQuery.includes('select *')) {
+        return data;
+    }
+    
+    // Handle WHERE clauses
+    if (lowerQuery.includes('where')) {
+        return filterByWhereClause(query, data);
+    }
+    
+    // Handle country filters
+    if (lowerQuery.includes('country') && lowerQuery.includes('=')) {
+        const country = extractValue(query, 'country');
+        return data.filter(player => player.country.toLowerCase() === country.toLowerCase());
+    }
+    
+    // Handle club filters
+    if (lowerQuery.includes('club') && lowerQuery.includes('=')) {
+        const club = extractValue(query, 'club');
+        return data.filter(player => player.club.toLowerCase() === club.toLowerCase());
+    }
+    
+    // Handle position filters
+    if (lowerQuery.includes('position') && lowerQuery.includes('=')) {
+        const position = extractValue(query, 'position');
+        return data.filter(player => player.position && player.position.toLowerCase() === position.toLowerCase());
+    }
+    
+    // Handle age filters
+    if (lowerQuery.includes('age') && (lowerQuery.includes('>') || lowerQuery.includes('<'))) {
+        return filterByAge(query, data);
+    }
+    
+    // Handle value filters
+    if (lowerQuery.includes('player_value') && (lowerQuery.includes('>') || lowerQuery.includes('<'))) {
+        return filterByValue(query, data);
+    }
+    
+    // Handle combined filters
+    if (lowerQuery.includes('and')) {
+        return filterByMultipleConditions(query, data);
+    }
+    
+    return data; // Default: return all data
+}
+
+// Helper functions for filtering
+function extractValue(query, field) {
+    const match = query.match(new RegExp(`${field}\\s*=\\s*['\\"]([^'\\"]+)['\\"]`, 'i'));
+    return match ? match[1] : null;
+}
+
+function filterByWhereClause(query, data) {
+    // Simple WHERE clause parsing - can be enhanced
+    return data; // For now, return all data
+}
+
+function filterByAge(query, data) {
+    const ageMatch = query.match(/age\\s*[><=]\\s*(\\d+)/i);
+    if (!ageMatch) return data;
+    
+    const age = parseInt(ageMatch[1]);
+    const operator = query.includes('>') ? '>' : '<';
+    
+    return data.filter(player => {
+        if (operator === '>') return player.age > age;
+        else return player.age < age;
+    });
+}
+
+function filterByValue(query, data) {
+    const valueMatch = query.match(/player_value\\s*[><=]\\s*(\\d+)/i);
+    if (!valueMatch) return data;
+    
+    const value = parseInt(valueMatch[1]);
+    const operator = query.includes('>') ? '>' : '<';
+    
+    return data.filter(player => {
+        if (operator === '>') return player.player_value > value;
+        else return player.player_value < value;
+    });
+}
+
+function filterByMultipleConditions(query, data) {
+    // Handle complex queries with multiple conditions
+    let filtered = [...data];
+    
+    // Country + Club
+    if (query.includes('country') && query.includes('club')) {
+        const country = extractValue(query, 'country');
+        const club = extractValue(query, 'club');
+        filtered = filtered.filter(player => 
+            player.country.toLowerCase() === country.toLowerCase() && 
+            player.club.toLowerCase() === club.toLowerCase()
+        );
+    }
+    
+    // Country + Value
+    if (query.includes('country') && query.includes('player_value')) {
+        const country = extractValue(query, 'country');
+        const value = extractValue(query, 'player_value');
+        const operator = query.includes('>') ? '>' : '<';
+        const numValue = parseInt(value);
+        
+        filtered = filtered.filter(player => 
+            player.country.toLowerCase() === country.toLowerCase() && 
+            (operator === '>' ? player.player_value > numValue : player.player_value < numValue)
+        );
+    }
+    
+    // Club + Value
+    if (query.includes('club') && query.includes('player_value')) {
+        const club = extractValue(query, 'club');
+        const value = extractValue(query, 'player_value');
+        const operator = query.includes('>') ? '>' : '<';
+        const numValue = parseInt(value);
+        
+        filtered = filtered.filter(player => 
+            player.club.toLowerCase() === club.toLowerCase() && 
+            (operator === '>' ? player.player_value > numValue : player.player_value < numValue)
+        );
+    }
+    
+    return filtered;
+}
 });
 
 // Health check endpoint
