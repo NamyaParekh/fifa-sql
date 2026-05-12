@@ -11,15 +11,18 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// MySQL connection - use environment variables for production
-const db = mysql.createConnection({
+// MySQL connection pool - better for production
+const db = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || 'Namya@123',
-    database: process.env.DB_NAME || 'fifa_playerstats'
+    database: process.env.DB_NAME || 'fifa_playerstats',
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
 });
 
-db.connect((err) => {
+db.getConnection((err, connection) => {
     if (err) {
         console.error('Error connecting to MySQL:', err);
         console.error('Please check:');
@@ -28,10 +31,11 @@ db.connect((err) => {
         console.error('3. MySQL is accessible from this application');
         return;
     }
+    
     console.log('✓ Successfully connected to MySQL server');
     
     // Show all available databases first
-    db.query('SHOW DATABASES', (err, results) => {
+    connection.query('SHOW DATABASES', (err, results) => {
         if (err) {
             console.error('Error showing databases:', err.message);
             return;
@@ -55,7 +59,7 @@ db.connect((err) => {
         } else {
             console.log('\n✓ "fifa_playerstats" database found');
             // Try to use the 'fifa_playerstats' database and show its tables
-            db.query('USE fifa_playerstats', (err) => {
+            connection.changeUser({ database: 'fifa_playerstats' }, (err) => {
                 if (err) {
                     console.error('Error switching to fifa_playerstats database:', err.message);
                     return;
@@ -63,7 +67,7 @@ db.connect((err) => {
                 console.log('✓ Successfully switched to fifa_playerstats database');
                 
                 // Show tables in fifa_playerstats database
-                db.query('SHOW TABLES', (err, results) => {
+                connection.query('SHOW TABLES', (err, results) => {
                     if (err) {
                         console.error('Error showing tables:', err.message);
                         return;
@@ -86,7 +90,7 @@ db.connect((err) => {
                             console.log('Natural language patterns will use this table name.');
                             
                             // Show column names for the player table
-                            db.query(`DESCRIBE ${playerTable}`, (err, columnResults) => {
+                            connection.query(`DESCRIBE ${playerTable}`, (err, columnResults) => {
                                 if (!err) {
                                     console.log(`\n=== COLUMNS IN ${playerTable.toUpperCase()} TABLE ===`);
                                     columnResults.forEach(col => {
@@ -96,7 +100,7 @@ db.connect((err) => {
                             });
                             
                             // Check if there's actual data in the player table
-                            db.query(`SELECT COUNT(*) as total_count FROM ${playerTable}`, (countErr, countResults) => {
+                            connection.query(`SELECT COUNT(*) as total_count FROM ${playerTable}`, (countErr, countResults) => {
                                 if (!countErr) {
                                     console.log(`\n=== DATA CHECK ===`);
                                     console.log(`Total players in ${playerTable}: ${countResults[0].total_count}`);
@@ -112,9 +116,13 @@ db.connect((err) => {
                         }
                     }
                 });
+                
+                // Release the connection back to the pool
+                connection.release();
             });
         }
     });
+});
 
 // Function to auto-detect the main player table
 function detectPlayerTable(tables) {
@@ -687,31 +695,40 @@ app.post('/api/query', (req, res) => {
     
     // Basic security check - only allow SELECT queries
     const trimmedQuery = query.trim().toLowerCase();
-    console.log('Executing query:', query); // Debug log
-    console.log('Trimmed query:', trimmedQuery); // Debug log
+    console.log('Executing query:', query); // Debug
+    console.log('Trimmed query:', trimmedQuery); // Debug
     console.log('Query type check - includes goalkeepers:', query.includes('goalkeepers')); // Debug
     console.log('Query type check - includes count:', query.includes('count')); // Debug
     if (!trimmedQuery.startsWith('select') && !trimmedQuery.startsWith('show') && !trimmedQuery.startsWith('describe')) {
         return res.status(400).json({ error: 'Only SELECT, SHOW, and DESCRIBE queries are allowed' });
     }
     
-    db.query(query, (err, results) => {
+    db.getConnection((err, connection) => {
         if (err) {
-            console.error('SQL Error:', err);
-            return res.status(500).json({ error: err.message });
+            console.error('Error getting database connection:', err);
+            return res.status(500).json({ error: 'Database connection error' });
         }
         
-        console.log('Query Results:', results); // Debug
-        console.log('Results Length:', results.length); // Debug
-        
-        // Generate natural language summary
-        const nlSummary = generateNaturalLanguageSummary(query, results, results.length);
-        
-        res.json({
-            success: true,
-            data: results,
-            rowCount: results.length,
-            nlSummary: nlSummary
+        connection.query(query, (err, results) => {
+            connection.release(); // Release connection back to pool
+            
+            if (err) {
+                console.error('SQL Error:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            
+            console.log('Query Results:', results); // Debug
+            console.log('Results Length:', results.length); // Debug
+            
+            // Generate natural language summary
+            const nlSummary = generateNaturalLanguageSummary(query, results, results.length);
+            
+            res.json({
+                success: true,
+                data: results,
+                rowCount: results.length,
+                nlSummary: nlSummary
+            });
         });
     });
 });
