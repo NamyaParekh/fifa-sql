@@ -17,13 +17,28 @@ let db;
 
 if (process.env.DB_TYPE === 'postgres') {
     // PostgreSQL connection for production (Render)
-    db = new Pool({
-        connectionString: process.env.DATABASE_URL,
-        ssl: {
-            rejectUnauthorized: false
-        }
-    });
-    console.log('Using PostgreSQL database');
+    if (process.env.DATABASE_URL) {
+        db = new Pool({
+            connectionString: process.env.DATABASE_URL,
+            ssl: {
+                rejectUnauthorized: false
+            }
+        });
+        console.log('Using PostgreSQL database with DATABASE_URL');
+    } else {
+        // Fallback for Render environment
+        db = new Pool({
+            host: process.env.DB_HOST || 'localhost',
+            user: process.env.DB_USER || 'postgres',
+            password: process.env.DB_PASSWORD || '',
+            database: process.env.DB_NAME || 'fifa_playerstats',
+            port: process.env.DB_PORT || 5432,
+            ssl: {
+                rejectUnauthorized: false
+            }
+        });
+        console.log('Using PostgreSQL database with individual env vars');
+    }
 } else {
     // MySQL connection for local development
     db = mysql.createPool({
