@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIFA SQL Terminal</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="terminal">
+        <div class="terminal-header">
+            <div class="terminal-title">FIFA SQL Terminal</div>
+            <div class="terminal-controls">
+                <div class="control minimize"></div>
+                <div class="control maximize"></div>
+                <div class="control close"></div>
+            </div>
+        </div>
+        
+        <div class="terminal-body">
+            <div class="mode-toggle">
+                <button id="sqlMode" class="mode-button active">SQL Mode</button>
+                <button id="nlMode" class="mode-button">Natural Language</button>
+            </div>
+            
+            <div class="input-section">
+                <div class="prompt" id="prompt">fifa-sql&gt;</div>
+                <textarea 
+                    id="sqlQuery" 
+                    placeholder="Enter your SQL query here..."
+                    rows="4"
+                ></textarea>
+            </div>
+            
+            <div class="button-group">
+                <button id="runQuery" class="run-button">Run Query</button>
+                <button id="convertBtn" class="convert-button" style="display: none;">Convert to SQL</button>
+            </div>
+            
+            <div class="output-section">
+                <div class="output-header">Output:</div>
+                <div id="output" class="output-content"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
