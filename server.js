@@ -150,7 +150,6 @@ function detectPlayerTable(tables) {
     
     return null;
 }
-});
 
 // Function to get the correct table name
 function getCorrectTableName() {
