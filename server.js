@@ -226,10 +226,148 @@ function convertNaturalLanguageToSQL(naturalLanguage, tableName = 'players') {
         // Youngest players
         'youngest players': `SELECT * FROM ${tableName} ORDER BY age ASC LIMIT 10;`,
         'youngest': `SELECT * FROM ${tableName} ORDER BY age ASC LIMIT 10;`,
+        'show youngest players': `SELECT * FROM ${tableName} ORDER BY age ASC LIMIT 10;`,
+        'who are the youngest players': `SELECT * FROM ${tableName} ORDER BY age ASC LIMIT 10;`,
         
         // Oldest players
         'oldest players': `SELECT * FROM ${tableName} ORDER BY age DESC LIMIT 10;`,
-        'oldest': `SELECT * FROM ${tableName} ORDER BY age DESC LIMIT 10;`
+        'oldest': `SELECT * FROM ${tableName} ORDER BY age DESC LIMIT 10;`,
+        'show oldest players': `SELECT * FROM ${tableName} ORDER BY age DESC LIMIT 10;`,
+        'who are the oldest players': `SELECT * FROM ${tableName} ORDER BY age DESC LIMIT 10;`,
+        
+        // PKL-specific advanced queries
+        'show top rated players': `SELECT * FROM ${tableName} ORDER BY overall_rating DESC LIMIT 10;`,
+        'show highest rated players': `SELECT * FROM ${tableName} ORDER BY overall_rating DESC LIMIT 10;`,
+        'show best players': `SELECT * FROM ${tableName} ORDER BY overall_rating DESC LIMIT 10;`,
+        'show most valuable players': `SELECT * FROM ${tableName} ORDER BY player_value DESC LIMIT 10;`,
+        'show richest players': `SELECT * FROM ${tableName} ORDER BY player_value DESC LIMIT 10;`,
+        'show most expensive players': `SELECT * FROM ${tableName} ORDER BY player_value DESC LIMIT 10;`,
+        
+        // Age-specific queries
+        'show players under 25': `SELECT * FROM ${tableName} WHERE age < 25 LIMIT 10;`,
+        'show players under 30': `SELECT * FROM ${tableName} WHERE age < 30 LIMIT 10;`,
+        'show players over 30': `SELECT * FROM ${tableName} WHERE age > 30 LIMIT 10;`,
+        'show players over 35': `SELECT * FROM ${tableName} WHERE age > 35 LIMIT 10;`,
+        'show players between 25 and 30': `SELECT * FROM ${tableName} WHERE age BETWEEN 25 AND 30 LIMIT 10;`,
+        'show players between 20 and 25': `SELECT * FROM ${tableName} WHERE age BETWEEN 20 AND 25 LIMIT 10;`,
+        
+        // Rating-specific queries
+        'show players with rating above 90': `SELECT * FROM ${tableName} WHERE overall_rating > 90 LIMIT 10;`,
+        'show players with rating above 85': `SELECT * FROM ${tableName} WHERE overall_rating > 85 LIMIT 10;`,
+        'show players with rating above 80': `SELECT * FROM ${tableName} WHERE overall_rating > 80 LIMIT 10;`,
+        'show elite players': `SELECT * FROM ${tableName} WHERE overall_rating >= 90 LIMIT 10;`,
+        'show world class players': `SELECT * FROM ${tableName} WHERE overall_rating >= 88 LIMIT 10;`,
+        
+        // Value-specific queries
+        'show players worth more than 100': `SELECT * FROM ${tableName} WHERE player_value > 100 LIMIT 10;`,
+        'show players worth more than 80': `SELECT * FROM ${tableName} WHERE player_value > 80 LIMIT 10;`,
+        'show players worth more than 60': `SELECT * FROM ${tableName} WHERE player_value > 60 LIMIT 10;`,
+        'show players worth less than 50': `SELECT * FROM ${tableName} WHERE player_value < 50 LIMIT 10;`,
+        'show budget players': `SELECT * FROM ${tableName} WHERE player_value < 60 LIMIT 10;`,
+        'show premium players': `SELECT * FROM ${tableName} WHERE player_value > 100 LIMIT 10;`,
+        
+        // Club-specific advanced queries
+        'show all chelsea players': `SELECT * FROM ${tableName} WHERE club = 'Chelsea' ORDER BY overall_rating DESC;`,
+        'show all man city players': `SELECT * FROM ${tableName} WHERE club = 'Man City' ORDER BY overall_rating DESC;`,
+        'show all man united players': `SELECT * FROM ${tableName} WHERE club = 'Man United' ORDER BY overall_rating DESC;`,
+        'show all arsenal players': `SELECT * FROM ${tableName} WHERE club = 'Arsenal' ORDER BY overall_rating DESC;`,
+        'show all liverpool players': `SELECT * FROM ${tableName} WHERE club = 'Liverpool' ORDER BY overall_rating DESC;`,
+        'show all real madrid players': `SELECT * FROM ${tableName} WHERE club = 'Real Madrid' ORDER BY overall_rating DESC;`,
+        'show all barcelona players': `SELECT * FROM ${tableName} WHERE club = 'Barcelona' ORDER BY overall_rating DESC;`,
+        'show all bayern munich players': `SELECT * FROM ${tableName} WHERE club = 'Bayern Munich' ORDER BY overall_rating DESC;`,
+        'show all psg players': `SELECT * FROM ${tableName} WHERE club = 'PSG' ORDER BY overall_rating DESC;`,
+        
+        // Country-specific advanced queries
+        'show all english players': `SELECT * FROM ${tableName} WHERE country = 'England' ORDER BY overall_rating DESC;`,
+        'show all brazilian players': `SELECT * FROM ${tableName} WHERE country = 'Brazil' ORDER BY overall_rating DESC;`,
+        'show all french players': `SELECT * FROM ${tableName} WHERE country = 'France' ORDER BY overall_rating DESC;`,
+        'show all german players': `SELECT * FROM ${tableName} WHERE country = 'Germany' ORDER BY overall_rating DESC;`,
+        'show all spanish players': `SELECT * FROM ${tableName} WHERE country = 'Spain' ORDER BY overall_rating DESC;`,
+        'show all portuguese players': `SELECT * FROM ${tableName} WHERE country = 'Portugal' ORDER BY overall_rating DESC;`,
+        'show all argentine players': `SELECT * FROM ${tableName} WHERE country = 'Argentina' ORDER BY overall_rating DESC;`,
+        'show all dutch players': `SELECT * FROM ${tableName} WHERE country = 'Netherlands' ORDER BY overall_rating DESC;`,
+        'show all belgian players': `SELECT * FROM ${tableName} WHERE country = 'Belgium' ORDER BY overall_rating DESC;`,
+        'show all italian players': `SELECT * FROM ${tableName} WHERE country = 'Italy' ORDER BY overall_rating DESC;`,
+        
+        // Combined advanced queries
+        'show english players from chelsea': `SELECT * FROM ${tableName} WHERE country = 'England' AND club = 'Chelsea' ORDER BY overall_rating DESC;`,
+        'show brazilian players from liverpool': `SELECT * FROM ${tableName} WHERE country = 'Brazil' AND club = 'Liverpool' ORDER BY overall_rating DESC;`,
+        'show french players from real madrid': `SELECT * FROM ${tableName} WHERE country = 'France' AND club = 'Real Madrid' ORDER BY overall_rating DESC;`,
+        'show german players from bayern munich': `SELECT * FROM ${tableName} WHERE country = 'Germany' AND club = 'Bayern Munich' ORDER BY overall_rating DESC;`,
+        'show spanish players from barcelona': `SELECT * FROM ${tableName} WHERE country = 'Spain' AND club = 'Barcelona' ORDER BY overall_rating DESC;`,
+        
+        // Value + Club combinations
+        'show chelsea players worth more than 70': `SELECT * FROM ${tableName} WHERE club = 'Chelsea' AND player_value > 70 ORDER BY player_value DESC;`,
+        'show man city players worth more than 80': `SELECT * FROM ${tableName} WHERE club = 'Man City' AND player_value > 80 ORDER BY player_value DESC;`,
+        'show real madrid players worth more than 90': `SELECT * FROM ${tableName} WHERE club = 'Real Madrid' AND player_value > 90 ORDER BY player_value DESC;`,
+        'show barcelona players worth more than 70': `SELECT * FROM ${tableName} WHERE club = 'Barcelona' AND player_value > 70 ORDER BY player_value DESC;`,
+        
+        // Rating + Club combinations
+        'show chelsea players with rating above 85': `SELECT * FROM ${tableName} WHERE club = 'Chelsea' AND overall_rating > 85 ORDER BY overall_rating DESC;`,
+        'show man city players with rating above 85': `SELECT * FROM ${tableName} WHERE club = 'Man City' AND overall_rating > 85 ORDER BY overall_rating DESC;`,
+        'show real madrid players with rating above 85': `SELECT * FROM ${tableName} WHERE club = 'Real Madrid' AND overall_rating > 85 ORDER BY overall_rating DESC;`,
+        'show barcelona players with rating above 85': `SELECT * FROM ${tableName} WHERE club = 'Barcelona' AND overall_rating > 85 ORDER BY overall_rating DESC;`,
+        
+        // Age + Club combinations
+        'show young chelsea players': `SELECT * FROM ${tableName} WHERE club = 'Chelsea' AND age < 25 ORDER BY age ASC;`,
+        'show young man city players': `SELECT * FROM ${tableName} WHERE club = 'Man City' AND age < 25 ORDER BY age ASC;`,
+        'show experienced chelsea players': `SELECT * FROM ${tableName} WHERE club = 'Chelsea' AND age > 30 ORDER BY age DESC;`,
+        'show experienced man city players': `SELECT * FROM ${tableName} WHERE club = 'Man City' AND age > 30 ORDER BY age DESC;`,
+        
+        // Statistical queries
+        'show average age': `SELECT AVG(age) as average_age FROM ${tableName};`,
+        'show average rating': `SELECT AVG(overall_rating) as average_rating FROM ${tableName};`,
+        'show average value': `SELECT AVG(player_value) as average_value FROM ${tableName};`,
+        'show highest rated player': `SELECT * FROM ${tableName} ORDER BY overall_rating DESC LIMIT 1;`,
+        'show most valuable player': `SELECT * FROM ${tableName} ORDER BY player_value DESC LIMIT 1;`,
+        'show youngest player': `SELECT * FROM ${tableName} ORDER BY age ASC LIMIT 1;`,
+        'show oldest player': `SELECT * FROM ${tableName} ORDER BY age DESC LIMIT 1;`,
+        
+        // Count queries
+        'how many players from england': `SELECT COUNT(*) as count FROM ${tableName} WHERE country = 'England';`,
+        'how many players from brazil': `SELECT COUNT(*) as count FROM ${tableName} WHERE country = 'Brazil';`,
+        'how many players from france': `SELECT COUNT(*) as count FROM ${tableName} WHERE country = 'France';`,
+        'how many players from germany': `SELECT COUNT(*) as count FROM ${tableName} WHERE country = 'Germany';`,
+        'how many players from spain': `SELECT COUNT(*) as count FROM ${tableName} WHERE country = 'Spain';`,
+        'how many players from chelsea': `SELECT COUNT(*) as count FROM ${tableName} WHERE club = 'Chelsea';`,
+        'how many players from man city': `SELECT COUNT(*) as count FROM ${tableName} WHERE club = 'Man City';`,
+        'how many players from real madrid': `SELECT COUNT(*) as count FROM ${tableName} WHERE club = 'Real Madrid';`,
+        'how many players from barcelona': `SELECT COUNT(*) as count FROM ${tableName} WHERE club = 'Barcelona';`,
+        'how many players from bayern munich': `SELECT COUNT(*) as count FROM ${tableName} WHERE club = 'Bayern Munich';`,
+        'how many players over 30': `SELECT COUNT(*) as count FROM ${tableName} WHERE age > 30;`,
+        'how many players under 25': `SELECT COUNT(*) as count FROM ${tableName} WHERE age < 25;`,
+        'how many players with rating above 85': `SELECT COUNT(*) as count FROM ${tableName} WHERE overall_rating > 85;`,
+        'how many players with rating above 90': `SELECT COUNT(*) as count FROM ${tableName} WHERE overall_rating > 90;`,
+        'how many players worth more than 100': `SELECT COUNT(*) as count FROM ${tableName} WHERE player_value > 100;`,
+        'how many players worth more than 80': `SELECT COUNT(*) as count FROM ${tableName} WHERE player_value > 80;`,
+        
+        // Comparison queries
+        'show players better than messi': `SELECT * FROM ${tableName} WHERE overall_rating > 90 ORDER BY overall_rating DESC;`,
+        'show players better than ronaldo': `SELECT * FROM ${tableName} WHERE overall_rating > 89 ORDER BY overall_rating DESC;`,
+        'show players younger than messi': `SELECT * FROM ${tableName} WHERE age < 37 ORDER BY overall_rating DESC;`,
+        'show players more valuable than messi': `SELECT * FROM ${tableName} WHERE player_value > 120 ORDER BY player_value DESC;`,
+        
+        // Special queries
+        'show legends': `SELECT * FROM ${tableName} WHERE overall_rating >= 90 AND age >= 30 ORDER BY overall_rating DESC;`,
+        'show rising stars': `SELECT * FROM ${tableName} WHERE overall_rating >= 85 AND age <= 25 ORDER BY overall_rating DESC;`,
+        'show veterans': `SELECT * FROM ${tableName} WHERE age >= 35 ORDER BY overall_rating DESC;`,
+        'show prospects': `SELECT * FROM ${tableName} WHERE age <= 22 AND overall_rating >= 80 ORDER BY overall_rating DESC;`,
+        'show bargain players': `SELECT * FROM ${tableName} WHERE player_value < 50 AND overall_rating >= 85 ORDER BY overall_rating DESC;`,
+        'show overpriced players': `SELECT * FROM ${tableName} WHERE player_value > 100 AND overall_rating < 85 ORDER BY player_value DESC;`,
+        
+        // Top lists
+        'top 10 players': `SELECT * FROM ${tableName} ORDER BY overall_rating DESC LIMIT 10;`,
+        'top 5 players': `SELECT * FROM ${tableName} ORDER BY overall_rating DESC LIMIT 5;`,
+        'top 3 players': `SELECT * FROM ${tableName} ORDER BY overall_rating DESC LIMIT 3;`,
+        'top 10 most valuable': `SELECT * FROM ${tableName} ORDER BY player_value DESC LIMIT 10;`,
+        'top 5 most valuable': `SELECT * FROM ${tableName} ORDER BY player_value DESC LIMIT 5;`,
+        'top 3 most valuable': `SELECT * FROM ${tableName} ORDER BY player_value DESC LIMIT 3;`,
+        'top 10 youngest': `SELECT * FROM ${tableName} ORDER BY age ASC LIMIT 10;`,
+        'top 5 youngest': `SELECT * FROM ${tableName} ORDER BY age ASC LIMIT 5;`,
+        'top 3 youngest': `SELECT * FROM ${tableName} ORDER BY age ASC LIMIT 3;`,
+        'top 10 oldest': `SELECT * FROM ${tableName} ORDER BY age DESC LIMIT 10;`,
+        'top 5 oldest': `SELECT * FROM ${tableName} ORDER BY age DESC LIMIT 5;`,
+        'top 3 oldest': `SELECT * FROM ${tableName} ORDER BY age DESC LIMIT 3;`
     };
     
     // Check for complex combined queries first (higher priority)
